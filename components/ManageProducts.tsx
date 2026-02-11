@@ -18,7 +18,7 @@ const ManageProducts: React.FC<ManageProductsProps> = ({ user, onBack }) => {
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false); // State สำหรับหน้าต่างจัดการหมวดหมู่
+  const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
 
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(false);
@@ -29,13 +29,11 @@ const ManageProducts: React.FC<ManageProductsProps> = ({ user, onBack }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilterCategory, setSelectedFilterCategory] = useState<string>('ทั้งหมด');
 
-  // State สำหรับ Popup ยืนยันการลบสินค้า
+  // Popup States
   const [deleteConfirmation, setDeleteConfirmation] = useState<{id: string, title: string} | null>(null);
-
-  // State สำหรับ Popup ยืนยันการลบหมวดหมู่ (เพิ่มใหม่)
   const [deleteCategoryConfirmation, setDeleteCategoryConfirmation] = useState<{id: string, name: string} | null>(null);
 
-  // Verification State (Admin Login)
+  // Verification State
   const [isVerified, setIsVerified] = useState(false);
   const [adminEmail, setAdminEmail] = useState(user.email || '');
   const [adminPassword, setAdminPassword] = useState('');
@@ -86,18 +84,16 @@ const ManageProducts: React.FC<ManageProductsProps> = ({ user, onBack }) => {
           id: doc.id,
           ...doc.data()
         } as CategoryItem));
-        // เรียงตามชื่อ หรือจะเพิ่ม field order ในอนาคตก็ได้
         setCategories(cats.sort((a, b) => a.name.localeCompare(b.name)));
       },
       (err) => {
         console.error("Firestore Category Error:", err);
-        // Fallback for UI to prevent broken filters if permissions are missing
         const defaultCats = DEFAULT_CATEGORIES.map(name => ({ id: name, name }));
         setCategories(defaultCats);
       }
     );
 
-    // 3. Auto-Seed Categories if empty
+    // 3. Auto-Seed Categories
     const checkAndSeedCategories = async () => {
         try {
             const snap = await getDocs(collection(db, 'categories'));
@@ -108,11 +104,8 @@ const ManageProducts: React.FC<ManageProductsProps> = ({ user, onBack }) => {
                 }
             }
         } catch (e: any) {
-            // Silently fail if permissions are missing to prevent noise
             if (e.code !== 'permission-denied') {
                 console.error("Auto-seed failed", e);
-            } else {
-                console.warn("Auto-seed skipped: Missing permissions to write to 'categories'. Please update Firestore Rules.");
             }
         }
     };
@@ -124,7 +117,6 @@ const ManageProducts: React.FC<ManageProductsProps> = ({ user, onBack }) => {
     };
   }, [isVerified]);
 
-  // กรองสินค้าตามหมวดหมู่และคำค้นหา
   const filteredProducts = useMemo(() => {
     return products.filter(p => {
       const matchCategory = selectedFilterCategory === 'ทั้งหมด' || p.category === selectedFilterCategory;
@@ -154,7 +146,6 @@ const ManageProducts: React.FC<ManageProductsProps> = ({ user, onBack }) => {
     setPrice('');
     setUnit('ชิ้น');
     setDetail('');
-    // Set default category to first available or empty
     setCategory(categories.length > 0 ? categories[0].name : '');
     setStatus('In Stock');
     setImageFile(null);
@@ -194,7 +185,7 @@ const ManageProducts: React.FC<ManageProductsProps> = ({ user, onBack }) => {
     }
   };
 
-  // --- Category Management Functions ---
+  // --- Category Management ---
   const handleAddCategory = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!newCategoryName.trim()) return;
@@ -217,12 +208,10 @@ const ManageProducts: React.FC<ManageProductsProps> = ({ user, onBack }) => {
       }
   };
 
-  // เรียก Popup ยืนยันการลบหมวดหมู่
   const requestDeleteCategory = (id: string, name: string) => {
       setDeleteCategoryConfirmation({ id, name });
   };
 
-  // ลบหมวดหมู่จริงๆ หลังจากกดยืนยันใน Popup
   const confirmDeleteCategory = async () => {
       if (!deleteCategoryConfirmation) return;
       const { id } = deleteCategoryConfirmation;
@@ -233,13 +222,11 @@ const ManageProducts: React.FC<ManageProductsProps> = ({ user, onBack }) => {
           alert('Error deleting category: ' + err.message);
       }
   };
-  // -------------------------------------
 
   const handleGenerateDescription = async () => {
     if (!title) return alert("กรุณาใส่ชื่อสินค้าก่อน");
     setLoading(true);
     try {
-      // Use dynamic import for GoogleGenAI to avoid build issues
       // @ts-ignore
       const { GoogleGenAI } = await import("https://esm.sh/@google/genai");
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -272,7 +259,6 @@ const ManageProducts: React.FC<ManageProductsProps> = ({ user, onBack }) => {
       let imageUrl = imagePreview;
       if (imageFile) imageUrl = await uploadImage(imageFile);
 
-      // Use selected category or first available if not selected
       const finalCategory = category || (categories.length > 0 ? categories[0].name : 'Uncategorized');
 
       const productData = { 
@@ -586,7 +572,7 @@ const ManageProducts: React.FC<ManageProductsProps> = ({ user, onBack }) => {
         </div>
       )}
 
-      {/* Delete Category Confirmation Popup (Z-Index สูงกว่า Category Manager) */}
+      {/* Delete Category Confirmation Popup */}
       {deleteCategoryConfirmation && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity" onClick={() => setDeleteCategoryConfirmation(null)}></div>
