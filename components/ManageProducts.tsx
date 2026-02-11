@@ -241,7 +241,7 @@ const ManageProducts: React.FC<ManageProductsProps> = ({ user, onBack }) => {
     try {
       // Use dynamic import for GoogleGenAI to avoid build issues
       // @ts-ignore
-      const { GoogleGenAI } = await import("https://esm.sh/@google/genai@0.1.1");
+      const { GoogleGenAI } = await import("https://esm.sh/@google/genai");
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
