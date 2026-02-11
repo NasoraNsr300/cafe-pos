@@ -1,5 +1,4 @@
 
-import { GoogleGenAI } from "@google/genai";
 import React, { useState, useEffect, useMemo } from 'react';
 import { db, User, auth, signInWithEmailAndPassword } from '../firebase';
 // @ts-ignore
@@ -240,6 +239,9 @@ const ManageProducts: React.FC<ManageProductsProps> = ({ user, onBack }) => {
     if (!title) return alert("กรุณาใส่ชื่อสินค้าก่อน");
     setLoading(true);
     try {
+      // Use dynamic import for GoogleGenAI to avoid build issues
+      // @ts-ignore
+      const { GoogleGenAI } = await import("https://esm.sh/@google/genai@0.1.1");
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
@@ -247,6 +249,7 @@ const ManageProducts: React.FC<ManageProductsProps> = ({ user, onBack }) => {
       });
       if (response.text) setDetail(response.text.trim());
     } catch (err: any) {
+      console.error(err);
       alert("AI Error: " + err.message);
     } finally {
       setLoading(false);
