@@ -138,7 +138,7 @@ const Login: React.FC<LoginProps> = ({ onGuestLogin }) => {
                     {!isSignUp && (
                       <li>หากคุณยังไม่เคยใช้งาน ให้เลือก <strong>"สมัครสมาชิกที่นี่"</strong> ด้านล่างเพื่อสร้างบัญชีใหม่</li>
                     )}
-                    <li>ไปที่ <strong>Firebase Console</strong> > <strong>Authentication</strong> > <strong>Sign-in method</strong></li>
+                    <li>ไปที่ <strong>Firebase Console</strong> &gt; <strong>Authentication</strong> &gt; <strong>Sign-in method</strong></li>
                     <li>ตรวจสอบว่า <strong>Email/Password</strong> เปลี่ยนสถานะเป็น <strong>Enabled</strong> แล้ว</li>
                     <li>หากใช้ Google: ตรวจสอบ <strong>Authorized domains</strong> และเพิ่ม <code className="bg-red-100 px-1 rounded font-bold text-red-900">{currentHostname}</code></li>
                   </ul>
