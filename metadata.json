@@ -1,0 +1,7 @@
+{
+  "name": "Cafe POS System",
+  "description": "A modern Point of Sale application for cafes featuring Firebase authentication, product management via Firestore, and a responsive ordering interface.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
