@@ -39,12 +39,24 @@ const Login: React.FC<LoginProps> = ({ onGuestLogin }) => {
         await signInWithEmailAndPassword(auth, email, password);
       }
     } catch (err: any) {
-      console.error("Auth Error Code:", err.code);
+      // Log only unexpected errors to avoid console noise for common user mistakes
+      const knownErrorCodes = [
+        'auth/invalid-credential',
+        'auth/email-already-in-use',
+        'auth/weak-password',
+        'auth/user-not-found',
+        'auth/wrong-password',
+        'auth/network-request-failed'
+      ];
+      
+      if (!knownErrorCodes.includes(err.code)) {
+        console.error("Auth Error Code:", err.code);
+      }
       
       // จัดการข้อผิดพลาด auth/invalid-credential 
       // (Firebase ใช้โค้ดนี้แทน User Not Found หรือ Wrong Password เพื่อความปลอดภัย)
       if (err.code === 'auth/invalid-credential') {
-        setError('อีเมลหรือรหัสผ่านไม่ถูกต้อง หรือยังไม่มีบัญชีนี้ในระบบ');
+        setError(isSignUp ? 'การลงทะเบียนล้มเหลว' : 'อีเมลหรือรหัสผ่านไม่ถูกต้อง (หากยังไม่มีบัญชี กรุณาสมัครสมาชิก)');
         setShowHelp(true);
       } else if (err.code === 'auth/email-already-in-use') {
         setError('อีเมลนี้ถูกใช้งานไปแล้ว กรุณาเข้าสู่ระบบแทน');
@@ -57,7 +69,7 @@ const Login: React.FC<LoginProps> = ({ onGuestLogin }) => {
       } else if (err.code === 'auth/network-request-failed') {
         setError('ไม่สามารถเชื่อมต่ออินเทอร์เน็ตได้');
       } else {
-        setError('เกิดข้อผิดพลาด: ' + err.message);
+        setError('เกิดข้อผิดพลาด: ' + (err.message || 'Unknown Error'));
       }
     } finally {
       setLoading(false);

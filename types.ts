@@ -15,8 +15,15 @@ export interface CartItem extends Product {
   quantity: number;
 }
 
-export enum Category {
-  DRINKS = 'เครื่องดื่ม',
-  BAKERY = 'เบเกอรี่',
-  DESSERT = 'ของหวาน'
+// เปลี่ยนจาก Enum เป็น Interface เพื่อรองรับ Dynamic Categories
+export interface CategoryItem {
+  id: string;
+  name: string;
 }
+
+// ข้อมูลหมวดหมู่เริ่มต้นสำหรับระบบ (Seed Data)
+export const DEFAULT_CATEGORIES = [
+  'เครื่องดื่ม',
+  'เบเกอรี่',
+  'ของหวาน'
+];

@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { User, logOut, db } from '../firebase';
 // @ts-ignore
 import { collection, onSnapshot } from 'firebase/firestore';
-import { Product, CartItem, Category } from '../types';
+import { Product, CartItem, CategoryItem, DEFAULT_CATEGORIES } from '../types';
 
 interface POSProps {
   user: User;
@@ -17,8 +17,9 @@ const ADMIN_EMAIL = "nasora.nsr300@gmail.com";
 
 const POS: React.FC<POSProps> = ({ user, onSwitchView, isGuest = false, onLogout }) => {
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string>(Category.DRINKS);
+  const [selectedCategory, setSelectedCategory] = useState<string>(''); // เริ่มต้นว่างไว้ก่อน
   
   // View Product Detail State
   const [viewProduct, setViewProduct] = useState<Product | null>(null);
@@ -35,7 +36,8 @@ const POS: React.FC<POSProps> = ({ user, onSwitchView, isGuest = false, onLogout
   const isAdmin = !isGuest && user.email === ADMIN_EMAIL;
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(
+    // Fetch Products
+    const unsubProducts = onSnapshot(
       collection(db, 'cafe'), 
       (snapshot) => {
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
@@ -51,8 +53,34 @@ const POS: React.FC<POSProps> = ({ user, onSwitchView, isGuest = false, onLogout
         }
       }
     );
-    return () => unsubscribe();
+
+    // Fetch Categories
+    const unsubCategories = onSnapshot(
+        collection(db, 'categories'),
+        (snapshot) => {
+            const cats = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CategoryItem));
+            setCategories(cats.sort((a, b) => a.name.localeCompare(b.name)));
+        },
+        (err) => {
+            console.error("Firestore Categories Error:", err);
+            // Fallback: Use default categories if Firestore fails (e.g., missing permissions)
+            const defaultCats = DEFAULT_CATEGORIES.map(name => ({ id: name, name }));
+            setCategories(defaultCats);
+        }
+    );
+
+    return () => {
+        unsubProducts();
+        unsubCategories();
+    };
   }, []);
+
+  // เมื่อโหลด Categories เสร็จ ให้เลือกหมวดหมู่แรกอัตโนมัติถ้ายังไม่ได้เลือก
+  useEffect(() => {
+      if (!selectedCategory && categories.length > 0) {
+          setSelectedCategory(categories[0].name);
+      }
+  }, [categories, selectedCategory]);
 
   const filteredProducts = useMemo(() => {
     return products.filter(p => 
@@ -199,19 +227,24 @@ const POS: React.FC<POSProps> = ({ user, onSwitchView, isGuest = false, onLogout
             {/* Category Tabs */}
             <div className="px-6 pt-6 pb-2">
                 <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
-                    {Object.values(Category).map(cat => (
-                        <button
-                            key={cat}
-                            onClick={() => setSelectedCategory(cat)}
-                            className={`px-6 py-3 rounded-2xl font-bold text-sm whitespace-nowrap transition-all border ${
-                                selectedCategory === cat
-                                    ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-200 scale-105'
-                                    : 'bg-white text-gray-500 border-gray-100 hover:border-gray-300 hover:bg-gray-50'
-                            }`}
-                        >
-                            {cat}
-                        </button>
-                    ))}
+                    {categories.length === 0 ? (
+                        // Skeleton Loaders for Categories
+                        [1,2,3].map(i => <div key={i} className="h-10 w-24 bg-gray-200 rounded-2xl animate-pulse"></div>)
+                    ) : (
+                        categories.map(cat => (
+                            <button
+                                key={cat.id}
+                                onClick={() => setSelectedCategory(cat.name)}
+                                className={`px-6 py-3 rounded-2xl font-bold text-sm whitespace-nowrap transition-all border ${
+                                    selectedCategory === cat.name
+                                        ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-200 scale-105'
+                                        : 'bg-white text-gray-500 border-gray-100 hover:border-gray-300 hover:bg-gray-50'
+                                }`}
+                            >
+                                {cat.name}
+                            </button>
+                        ))
+                    )}
                 </div>
             </div>
 

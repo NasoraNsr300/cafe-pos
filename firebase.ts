@@ -14,10 +14,16 @@ import { getFirestore } from 'firebase/firestore';
  * rules_version = '2';
  * service cloud.firestore {
  *   match /databases/{database}/documents {
+ *     
+ *     // Rules for Products
  *     match /cafe/{document=**} {
- *       // อนุญาตให้อ่านได้ทุกคน (Public Read)
  *       allow read: if true;
- *       // อนุญาตให้ เพิ่ม/แก้ไข/ลบ เฉพาะคนที่ Login แล้วเท่านั้น (Authenticated Write)
+ *       allow write: if request.auth != null;
+ *     }
+ *     
+ *     // Rules for Categories (New)
+ *     match /categories/{document=**} {
+ *       allow read: if true;
  *       allow write: if request.auth != null;
  *     }
  *   }

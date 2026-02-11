@@ -1,10 +1,10 @@
 
 import { GoogleGenAI } from "@google/genai";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { db, User, auth, signInWithEmailAndPassword } from '../firebase';
 // @ts-ignore
-import { collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore';
-import { Product, Category } from '../types';
+import { collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, getDocs } from 'firebase/firestore';
+import { Product, CategoryItem, DEFAULT_CATEGORIES } from '../types';
 
 interface ManageProductsProps {
   user: User;
@@ -16,14 +16,25 @@ const CLOUDINARY_URL = "https://api.cloudinary.com/v1_1/dsowwhxak/image/upload";
 
 const ManageProducts: React.FC<ManageProductsProps> = ({ user, onBack }) => {
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<CategoryItem[]>([]);
+  
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false); // State สำหรับหน้าต่างจัดการหมวดหมู่
+
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // State สำหรับ Popup ยืนยันการลบ
+  // Filter & Search State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedFilterCategory, setSelectedFilterCategory] = useState<string>('ทั้งหมด');
+
+  // State สำหรับ Popup ยืนยันการลบสินค้า
   const [deleteConfirmation, setDeleteConfirmation] = useState<{id: string, title: string} | null>(null);
+
+  // State สำหรับ Popup ยืนยันการลบหมวดหมู่ (เพิ่มใหม่)
+  const [deleteCategoryConfirmation, setDeleteCategoryConfirmation] = useState<{id: string, name: string} | null>(null);
 
   // Verification State (Admin Login)
   const [isVerified, setIsVerified] = useState(false);
@@ -38,19 +49,23 @@ const ManageProducts: React.FC<ManageProductsProps> = ({ user, onBack }) => {
   const [price, setPrice] = useState('');
   const [unit, setUnit] = useState('ชิ้น');
   const [detail, setDetail] = useState('');
-  const [category, setCategory] = useState<string>(Category.DRINKS);
+  const [category, setCategory] = useState<string>('');
   const [status, setStatus] = useState<'In Stock' | 'Sold Out'>('In Stock');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState('');
 
+  // Category Management State
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [editingCategoryName, setEditingCategoryName] = useState('');
+
   useEffect(() => {
     if (!isVerified) return;
 
-    // ติดตามข้อมูลแบบ Real-time จาก Firebase
-    const unsubscribe = onSnapshot(
+    // 1. Fetch Products
+    const unsubProducts = onSnapshot(
       collection(db, 'cafe'), 
       (snapshot) => {
-        // Map ข้อมูลโดยให้ id จาก doc.id ทับข้อมูลใน data เพื่อความถูกต้อง 100%
         const docs = snapshot.docs.map(doc => ({ 
           ...doc.data(), 
           id: doc.id 
@@ -59,12 +74,66 @@ const ManageProducts: React.FC<ManageProductsProps> = ({ user, onBack }) => {
         setError(null);
       },
       (err) => {
-        console.error("Firestore Fetch Error:", err);
-        setError(`ไม่สามารถโหลดข้อมูลได้: ${err.code === 'permission-denied' ? 'สิทธิ์ถูกปฏิเสธ (ตรวจสอบ Rules ใน Console)' : err.message}`);
+        console.error("Firestore Product Error:", err);
+        setError(`ไม่สามารถโหลดสินค้าได้: ${err.message}`);
       }
     );
-    return () => unsubscribe();
+
+    // 2. Fetch Categories
+    const unsubCategories = onSnapshot(
+      collection(db, 'categories'),
+      (snapshot) => {
+        const cats = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        } as CategoryItem));
+        // เรียงตามชื่อ หรือจะเพิ่ม field order ในอนาคตก็ได้
+        setCategories(cats.sort((a, b) => a.name.localeCompare(b.name)));
+      },
+      (err) => {
+        console.error("Firestore Category Error:", err);
+        // Fallback for UI to prevent broken filters if permissions are missing
+        const defaultCats = DEFAULT_CATEGORIES.map(name => ({ id: name, name }));
+        setCategories(defaultCats);
+      }
+    );
+
+    // 3. Auto-Seed Categories if empty
+    const checkAndSeedCategories = async () => {
+        try {
+            const snap = await getDocs(collection(db, 'categories'));
+            if (snap.empty) {
+                console.log("Seeding default categories...");
+                for (const catName of DEFAULT_CATEGORIES) {
+                    await addDoc(collection(db, 'categories'), { name: catName });
+                }
+            }
+        } catch (e: any) {
+            // Silently fail if permissions are missing to prevent noise
+            if (e.code !== 'permission-denied') {
+                console.error("Auto-seed failed", e);
+            } else {
+                console.warn("Auto-seed skipped: Missing permissions to write to 'categories'. Please update Firestore Rules.");
+            }
+        }
+    };
+    checkAndSeedCategories();
+
+    return () => {
+        unsubProducts();
+        unsubCategories();
+    };
   }, [isVerified]);
+
+  // กรองสินค้าตามหมวดหมู่และคำค้นหา
+  const filteredProducts = useMemo(() => {
+    return products.filter(p => {
+      const matchCategory = selectedFilterCategory === 'ทั้งหมด' || p.category === selectedFilterCategory;
+      const matchSearch = p.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          (p.type && p.type.toLowerCase().includes(searchQuery.toLowerCase()));
+      return matchCategory && matchSearch;
+    });
+  }, [products, selectedFilterCategory, searchQuery]);
 
   const handleAdminVerify = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,7 +155,8 @@ const ManageProducts: React.FC<ManageProductsProps> = ({ user, onBack }) => {
     setPrice('');
     setUnit('ชิ้น');
     setDetail('');
-    setCategory(Category.DRINKS);
+    // Set default category to first available or empty
+    setCategory(categories.length > 0 ? categories[0].name : '');
     setStatus('In Stock');
     setImageFile(null);
     setImagePreview('');
@@ -107,29 +177,64 @@ const ManageProducts: React.FC<ManageProductsProps> = ({ user, onBack }) => {
     setIsFormOpen(true);
   };
 
-  // 1. เรียกใช้เมื่อกดปุ่มถังขยะ (เปิด Popup)
   const requestDelete = (productId: string, productName: string) => {
     setDeleteConfirmation({ id: productId, title: productName });
   };
 
-  // 2. เรียกใช้เมื่อกดยืนยันใน Popup (ลบจริง)
   const confirmDelete = async () => {
     if (!deleteConfirmation) return;
     const { id } = deleteConfirmation;
-
-    // ปิด Popup ก่อนเริ่มลบ
     setDeleteConfirmation(null);
-
     try {
       setDeletingId(id);
       await deleteDoc(doc(db, 'cafe', id));
     } catch (err: any) {
       setError(`ลบไม่สำเร็จ: ${err.message}`);
-      // alert(`ลบไม่สำเร็จ: ${err.message}`); // แจ้งเตือนผ่าน UI ด้านบนแทน
     } finally {
       setDeletingId(null);
     }
   };
+
+  // --- Category Management Functions ---
+  const handleAddCategory = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!newCategoryName.trim()) return;
+      try {
+          await addDoc(collection(db, 'categories'), { name: newCategoryName.trim() });
+          setNewCategoryName('');
+      } catch (err: any) {
+          alert('Error adding category: ' + err.message);
+      }
+  };
+
+  const handleUpdateCategory = async (id: string) => {
+      if (!editingCategoryName.trim()) return;
+      try {
+          await updateDoc(doc(db, 'categories', id), { name: editingCategoryName.trim() });
+          setEditingCategoryId(null);
+          setEditingCategoryName('');
+      } catch (err: any) {
+          alert('Error updating category: ' + err.message);
+      }
+  };
+
+  // เรียก Popup ยืนยันการลบหมวดหมู่
+  const requestDeleteCategory = (id: string, name: string) => {
+      setDeleteCategoryConfirmation({ id, name });
+  };
+
+  // ลบหมวดหมู่จริงๆ หลังจากกดยืนยันใน Popup
+  const confirmDeleteCategory = async () => {
+      if (!deleteCategoryConfirmation) return;
+      const { id } = deleteCategoryConfirmation;
+      try {
+          await deleteDoc(doc(db, 'categories', id));
+          setDeleteCategoryConfirmation(null);
+      } catch (err: any) {
+          alert('Error deleting category: ' + err.message);
+      }
+  };
+  // -------------------------------------
 
   const handleGenerateDescription = async () => {
     if (!title) return alert("กรุณาใส่ชื่อสินค้าก่อน");
@@ -164,13 +269,16 @@ const ManageProducts: React.FC<ManageProductsProps> = ({ user, onBack }) => {
       let imageUrl = imagePreview;
       if (imageFile) imageUrl = await uploadImage(imageFile);
 
+      // Use selected category or first available if not selected
+      const finalCategory = category || (categories.length > 0 ? categories[0].name : 'Uncategorized');
+
       const productData = { 
         title, 
         type: productType, 
         price: parseFloat(price), 
         unit, 
         detail, 
-        category, 
+        category: finalCategory, 
         status, 
         image: imageUrl 
       };
@@ -217,8 +325,8 @@ const ManageProducts: React.FC<ManageProductsProps> = ({ user, onBack }) => {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-white">
-      <header className="px-6 py-4 border-b flex items-center justify-between sticky top-0 bg-white z-10">
+    <div className="flex flex-col h-screen bg-gray-50">
+      <header className="px-6 py-4 border-b flex items-center justify-between sticky top-0 bg-white z-10 shadow-sm">
         <div className="flex items-center gap-4">
           <button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
@@ -228,8 +336,62 @@ const ManageProducts: React.FC<ManageProductsProps> = ({ user, onBack }) => {
             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Cloud Firestore Database</p>
           </div>
         </div>
-        <button onClick={() => setIsFormOpen(true)} className="bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-100 active:scale-95 transition-all">เพิ่มสินค้าใหม่</button>
+        <div className="flex gap-3">
+            <button 
+                onClick={() => setIsCategoryManagerOpen(true)}
+                className="bg-white border border-gray-200 text-gray-700 px-5 py-2.5 rounded-xl font-bold hover:bg-gray-50 hover:border-gray-300 shadow-sm active:scale-95 transition-all flex items-center gap-2"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
+                <span>จัดการหมวดหมู่</span>
+            </button>
+            <button onClick={() => { resetForm(); setIsFormOpen(true); }} className="bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-100 active:scale-95 transition-all flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+                <span>เพิ่มสินค้าใหม่</span>
+            </button>
+        </div>
       </header>
+
+      {/* Categorization & Search Section */}
+      <div className="bg-white border-b border-gray-100 px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        {/* Category Tabs */}
+        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+          <button
+            onClick={() => setSelectedFilterCategory('ทั้งหมด')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all border ${
+              selectedFilterCategory === 'ทั้งหมด'
+                ? 'bg-blue-600 text-white border-blue-600 shadow-md'
+                : 'bg-white text-gray-500 border-gray-100 hover:border-gray-300'
+            }`}
+          >
+            ทั้งหมด
+          </button>
+          {categories.map(cat => (
+            <button
+              key={cat.id}
+              onClick={() => setSelectedFilterCategory(cat.name)}
+              className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all border ${
+                selectedFilterCategory === cat.name
+                  ? 'bg-blue-600 text-white border-blue-600 shadow-md'
+                  : 'bg-white text-gray-500 border-gray-100 hover:border-gray-300'
+              }`}
+            >
+              {cat.name}
+            </button>
+          ))}
+        </div>
+
+        {/* Search Input */}
+        <div className="relative w-full md:w-72 group">
+          <input
+            type="text"
+            placeholder="ค้นหาชื่อสินค้า..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-gray-50 border border-gray-100 rounded-xl py-2 pl-9 pr-4 text-xs font-bold text-gray-700 focus:bg-white focus:border-blue-500 transition-all outline-none"
+          />
+          <svg className="absolute left-3 top-2.5 text-gray-400 group-focus-within:text-blue-500 transition-colors" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        </div>
+      </div>
 
       <main className="flex-grow p-6 overflow-y-auto no-scrollbar">
         {error && (
@@ -251,7 +413,7 @@ const ManageProducts: React.FC<ManageProductsProps> = ({ user, onBack }) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {products.map(p => (
+              {filteredProducts.map(p => (
                 <tr key={p.id} className="hover:bg-blue-50/20 transition-colors">
                   <td className="px-6 py-4">
                     <img src={p.image} className="h-12 w-12 rounded-xl object-cover border bg-gray-50" />
@@ -286,7 +448,7 @@ const ManageProducts: React.FC<ManageProductsProps> = ({ user, onBack }) => {
                         {deletingId === p.id ? (
                           <div className="h-4 w-4 border-2 border-red-600 border-t-transparent animate-spin rounded-full"></div>
                         ) : (
-                          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
                         )}
                       </button>
                     </div>
@@ -295,13 +457,15 @@ const ManageProducts: React.FC<ManageProductsProps> = ({ user, onBack }) => {
               ))}
             </tbody>
           </table>
-          {products.length === 0 && (
-            <div className="p-20 text-center text-gray-400 font-bold uppercase text-xs tracking-widest">ไม่มีข้อมูลสินค้าในคอลเลกชัน 'cafe'</div>
+          {filteredProducts.length === 0 && (
+            <div className="p-20 text-center text-gray-400 font-bold uppercase text-xs tracking-widest">
+              {products.length === 0 ? "ไม่มีข้อมูลสินค้าในฐานข้อมูล" : "ไม่พบสินค้าที่ตรงกับการค้นหา"}
+            </div>
           )}
         </div>
       </main>
 
-      {/* Delete Confirmation Popup */}
+      {/* Delete Product Confirmation Popup */}
       {deleteConfirmation && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm transition-opacity" onClick={() => setDeleteConfirmation(null)}></div>
@@ -336,7 +500,125 @@ const ManageProducts: React.FC<ManageProductsProps> = ({ user, onBack }) => {
         </div>
       )}
 
-      {/* Full-featured Form Side Panel */}
+      {/* Category Manager Modal */}
+      {isCategoryManagerOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsCategoryManagerOpen(false)}></div>
+            <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200">
+                <div className="p-6 border-b flex items-center justify-between">
+                    <div>
+                        <h2 className="text-xl font-black uppercase tracking-tight text-gray-800">จัดการหมวดหมู่</h2>
+                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">Manage Product Categories</p>
+                    </div>
+                    <button onClick={() => setIsCategoryManagerOpen(false)} className="h-8 w-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors">✕</button>
+                </div>
+                
+                <div className="flex-grow overflow-y-auto p-6 space-y-3 no-scrollbar bg-gray-50">
+                    {categories.length === 0 && (
+                        <p className="text-center text-xs text-gray-400 py-4">ยังไม่มีหมวดหมู่สินค้า</p>
+                    )}
+                    {categories.map(cat => (
+                        <div key={cat.id} className="bg-white p-3 rounded-xl border border-gray-100 shadow-sm flex items-center justify-between group">
+                            {editingCategoryId === cat.id ? (
+                                <div className="flex items-center gap-2 w-full">
+                                    <input 
+                                        type="text" 
+                                        value={editingCategoryName}
+                                        onChange={(e) => setEditingCategoryName(e.target.value)}
+                                        className="flex-grow bg-gray-50 border border-blue-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none"
+                                        autoFocus
+                                    />
+                                    <button onClick={() => handleUpdateCategory(cat.id)} className="p-1.5 bg-green-100 text-green-600 rounded-lg hover:bg-green-200">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                    </button>
+                                    <button onClick={() => setEditingCategoryId(null)} className="p-1.5 bg-gray-100 text-gray-500 rounded-lg hover:bg-gray-200">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                    </button>
+                                </div>
+                            ) : (
+                                <>
+                                    <span className="font-bold text-gray-700 text-sm pl-2">{cat.name}</span>
+                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button 
+                                            onClick={() => {
+                                                setEditingCategoryId(cat.id);
+                                                setEditingCategoryName(cat.name);
+                                            }}
+                                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                                        </button>
+                                        <button 
+                                            onClick={() => requestDeleteCategory(cat.id, cat.name)}
+                                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    ))}
+                </div>
+
+                <div className="p-4 bg-white border-t rounded-b-3xl">
+                    <form onSubmit={handleAddCategory} className="flex gap-2">
+                        <input 
+                            type="text" 
+                            placeholder="ชื่อหมวดหมู่ใหม่..." 
+                            value={newCategoryName}
+                            onChange={(e) => setNewCategoryName(e.target.value)}
+                            className="flex-grow bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold focus:bg-white focus:border-blue-500 focus:outline-none transition-all"
+                        />
+                        <button 
+                            type="submit"
+                            disabled={!newCategoryName.trim()}
+                            className="bg-gray-900 text-white px-4 py-2.5 rounded-xl font-bold hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                        >
+                            เพิ่ม
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+      )}
+
+      {/* Delete Category Confirmation Popup (Z-Index สูงกว่า Category Manager) */}
+      {deleteCategoryConfirmation && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity" onClick={() => setDeleteCategoryConfirmation(null)}></div>
+          <div className="relative w-full max-w-sm bg-white rounded-3xl shadow-2xl p-6 transform transition-all scale-100 animate-in zoom-in-95 duration-200">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100 mb-4">
+              <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+              </svg>
+            </div>
+            <div className="text-center space-y-2">
+              <h3 className="text-lg font-black text-gray-900">ลบหมวดหมู่</h3>
+              <p className="text-sm text-gray-500">
+                คุณต้องการลบหมวดหมู่ <span className="font-bold text-gray-800">"{deleteCategoryConfirmation.name}"</span> ใช่หรือไม่? 
+                <br/>สินค้าในหมวดหมู่นี้จะถูกแสดงเป็น "Uncategorized"
+              </p>
+            </div>
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={() => setDeleteCategoryConfirmation(null)}
+                className="flex-1 rounded-xl bg-gray-100 px-4 py-3 text-sm font-bold text-gray-700 hover:bg-gray-200 transition-colors"
+              >
+                ยกเลิก
+              </button>
+              <button
+                onClick={confirmDeleteCategory}
+                className="flex-1 rounded-xl bg-red-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-red-200 hover:bg-red-700 transition-all active:scale-95"
+              >
+                ยืนยันการลบ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Form Side Panel (Add/Edit Product) */}
       {isFormOpen && (
         <div className="fixed inset-0 z-50 flex justify-end">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={resetForm}></div>
@@ -404,7 +686,10 @@ const ManageProducts: React.FC<ManageProductsProps> = ({ user, onBack }) => {
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">หมวดหมู่หลัก</label>
                 <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 text-sm font-bold focus:bg-white focus:border-blue-500 focus:outline-none transition-all appearance-none">
-                  {Object.values(Category).map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                  {categories.length === 0 && <option value="">ไม่พบหมวดหมู่ (เพิ่มในจัดการหมวดหมู่)</option>}
+                  {categories.map(cat => (
+                      <option key={cat.id} value={cat.name}>{cat.name}</option>
+                  ))}
                 </select>
               </div>
 
