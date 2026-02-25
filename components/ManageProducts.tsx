@@ -35,7 +35,7 @@ const ManageProducts: React.FC<ManageProductsProps> = ({ user, onBack }) => {
 
   // Verification State
   const [isVerified, setIsVerified] = useState(false);
-  const [adminEmail, setAdminEmail] = useState(user.email || '');
+  const [adminEmail] = useState(user.email || '');
   const [adminPassword, setAdminPassword] = useState('');
   const [authError, setAuthError] = useState('');
   const [verifying, setVerifying] = useState(false);

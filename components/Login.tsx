@@ -5,8 +5,10 @@ import {
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword,
   updateProfile,
-  auth 
+  auth,
+  db
 } from '../firebase';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 interface LoginProps {
   onGuestLogin?: () => void;
@@ -17,6 +19,8 @@ const Login: React.FC<LoginProps> = ({ onGuestLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [address, setAddress] = useState('');
+  const [birthDate, setBirthDate] = useState('');
   const [error, setError] = useState('');
   const [showHelp, setShowHelp] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -31,9 +35,23 @@ const Login: React.FC<LoginProps> = ({ onGuestLogin }) => {
       if (isSignUp) {
         // สมัครสมาชิกใหม่
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+        
         if (displayName) {
-          await updateProfile(userCredential.user, { displayName });
+          await updateProfile(user, { displayName });
         }
+
+        // บันทึกข้อมูลสมาชิกเพิ่มเติมลง Firestore
+        await setDoc(doc(db, "members", user.uid), {
+          uid: user.uid,
+          email: user.email,
+          displayName: displayName || 'Member',
+          address: address || '',
+          birthDate: birthDate || '',
+          role: 'member', // ค่าเริ่มต้น
+          createdAt: serverTimestamp()
+        });
+
       } else {
         // เข้าสู่ระบบ
         await signInWithEmailAndPassword(auth, email, password);
@@ -150,13 +168,40 @@ const Login: React.FC<LoginProps> = ({ onGuestLogin }) => {
           <form onSubmit={handleAuth} className="space-y-4">
             {isSignUp && (
               <div className="space-y-1.5 animate-in fade-in slide-in-from-left-2 duration-300">
-                <label className="text-xs font-black uppercase text-gray-400 tracking-widest ml-1">ชื่อผู้ใช้งาน</label>
+                <label className="text-xs font-black uppercase text-gray-400 tracking-widest ml-1">ชื่อ-นามสกุล</label>
                 <input
                   type="text"
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
                   className="w-full rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3.5 text-sm font-medium focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-50 transition-all"
                   placeholder="ชื่อของคุณ"
+                  required={isSignUp}
+                />
+              </div>
+            )}
+
+            {isSignUp && (
+              <div className="space-y-1.5 animate-in fade-in slide-in-from-left-2 duration-300 delay-75">
+                <label className="text-xs font-black uppercase text-gray-400 tracking-widest ml-1">วันเกิด</label>
+                <input
+                  type="date"
+                  value={birthDate}
+                  onChange={(e) => setBirthDate(e.target.value)}
+                  className="w-full rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3.5 text-sm font-medium focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-50 transition-all"
+                  required={isSignUp}
+                />
+              </div>
+            )}
+
+            {isSignUp && (
+              <div className="space-y-1.5 animate-in fade-in slide-in-from-left-2 duration-300 delay-100">
+                <label className="text-xs font-black uppercase text-gray-400 tracking-widest ml-1">ที่อยู่</label>
+                <textarea
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  className="w-full rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3.5 text-sm font-medium focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-50 transition-all resize-none"
+                  placeholder="ที่อยู่ของคุณ..."
+                  rows={3}
                   required={isSignUp}
                 />
               </div>

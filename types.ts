@@ -22,8 +22,21 @@ export interface CategoryItem {
 }
 
 // ข้อมูลหมวดหมู่เริ่มต้นสำหรับระบบ (Seed Data)
+
+export interface Member {
+  uid: string;
+  email: string;
+  displayName: string;
+  address: string;
+  birthDate: string;
+  role: 'member' | 'admin' | 'staff';
+  createdAt: any; // Firestore Timestamp
+}
+
+// ข้อมูลหมวดหมู่เริ่มต้นสำหรับระบบ (Seed Data)
 export const DEFAULT_CATEGORIES = [
   'เครื่องดื่ม',
   'เบเกอรี่',
   'ของหวาน'
 ];
+
