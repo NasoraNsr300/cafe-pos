@@ -9,6 +9,7 @@ import {
   db
 } from '../firebase';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { ADMIN_EMAILS } from '../types';
 
 interface LoginProps {
   onGuestLogin?: () => void;
@@ -41,12 +42,13 @@ const Login: React.FC<LoginProps> = ({ onGuestLogin }) => {
         }
 
         // บันทึกข้อมูลสมาชิกเพิ่มเติมลง Firestore
+        const role = user.email && ADMIN_EMAILS.includes(user.email) ? 'admin' : 'member';
         await setDoc(doc(db, "members", user.uid), {
           uid: user.uid,
           email: user.email,
           displayName: displayName || 'Member',
           birthDate: birthDate || '',
-          role: 'member', // ค่าเริ่มต้น
+          role: role, // ค่าเริ่มต้น หรือ admin ถ้าเป็นอีเมลผู้ดูแล
           createdAt: serverTimestamp()
         });
 
@@ -105,12 +107,13 @@ const Login: React.FC<LoginProps> = ({ onGuestLogin }) => {
       const docSnap = await getDoc(docRef);
       
       if (!docSnap.exists()) {
+        const role = user.email && ADMIN_EMAILS.includes(user.email) ? 'admin' : 'member';
         await setDoc(docRef, {
           uid: user.uid,
           email: user.email,
           displayName: user.displayName || 'Member',
           birthDate: '',
-          role: 'member', // กำหนดให้เป็น member เป็นพื้นฐาน
+          role: role, // กำหนดให้เป็น member เป็นพื้นฐาน หรือ admin ถ้าเป็นอีเมลผู้ดูแล
           createdAt: serverTimestamp()
         });
       }

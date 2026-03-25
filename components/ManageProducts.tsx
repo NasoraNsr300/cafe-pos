@@ -42,7 +42,6 @@ const ManageProducts: React.FC<ManageProductsProps> = ({ user, onBack }) => {
 
   // Form states
   const [title, setTitle] = useState('');
-  const [productType, setProductType] = useState('');
   const [price, setPrice] = useState('');
   const [unit, setUnit] = useState('ชิ้น');
   const [detail, setDetail] = useState('');
@@ -120,8 +119,7 @@ const ManageProducts: React.FC<ManageProductsProps> = ({ user, onBack }) => {
   const filteredProducts = useMemo(() => {
     return products.filter(p => {
       const matchCategory = selectedFilterCategory === 'ทั้งหมด' || p.category === selectedFilterCategory;
-      const matchSearch = p.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          (p.type && p.type.toLowerCase().includes(searchQuery.toLowerCase()));
+      const matchSearch = p.title.toLowerCase().includes(searchQuery.toLowerCase());
       return matchCategory && matchSearch;
     });
   }, [products, selectedFilterCategory, searchQuery]);
@@ -142,7 +140,6 @@ const ManageProducts: React.FC<ManageProductsProps> = ({ user, onBack }) => {
 
   const resetForm = () => {
     setTitle('');
-    setProductType('');
     setPrice('');
     setUnit('ชิ้น');
     setDetail('');
@@ -157,7 +154,6 @@ const ManageProducts: React.FC<ManageProductsProps> = ({ user, onBack }) => {
   const handleEdit = (p: Product) => {
     setEditingProduct(p);
     setTitle(p.title);
-    setProductType(p.type || '');
     setPrice(p.price.toString());
     setUnit(p.unit);
     setDetail(p.detail);
@@ -232,7 +228,7 @@ const ManageProducts: React.FC<ManageProductsProps> = ({ user, onBack }) => {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: `ช่วยเขียนคำอธิบายสินค้าน่ารักๆ สำหรับคาเฟ่ สำหรับสินค้าชื่อ "${title}" ประเภท "${productType || category}" ให้สั้นและน่าสนใจ 1 ประโยค`,
+        contents: `ช่วยเขียนคำอธิบายสินค้าน่ารักๆ สำหรับคาเฟ่ สำหรับสินค้าชื่อ "${title}" ประเภท "${category}" ให้สั้นและน่าสนใจ 1 ประโยค`,
       });
       if (response.text) setDetail(response.text.trim());
     } catch (err: any) {
@@ -263,7 +259,6 @@ const ManageProducts: React.FC<ManageProductsProps> = ({ user, onBack }) => {
 
       const productData = { 
         title, 
-        type: productType, 
         price: parseFloat(price), 
         unit, 
         detail, 
@@ -409,7 +404,7 @@ const ManageProducts: React.FC<ManageProductsProps> = ({ user, onBack }) => {
                   </td>
                   <td className="px-6 py-4">
                     <div className="font-bold text-gray-800 text-sm">{p.title}</div>
-                    <div className="text-[10px] text-blue-500 font-bold uppercase">{p.category} {p.type ? `• ${p.type}` : ''}</div>
+                    <div className="text-[10px] text-blue-500 font-bold uppercase">{p.category}</div>
                     <div className="text-[8px] text-gray-300 font-mono mt-1">ID: {p.id}</div>
                   </td>
                   <td className="px-6 py-4">
@@ -652,11 +647,6 @@ const ManageProducts: React.FC<ManageProductsProps> = ({ user, onBack }) => {
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">ชื่อสินค้า</label>
                 <input required value={title} onChange={(e) => setTitle(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 text-sm font-bold focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-50 transition-all" placeholder="เช่น ลาเต้เย็น" />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">ประเภทสินค้า (ระบุเพิ่ม)</label>
-                <input value={productType} onChange={(e) => setProductType(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 text-sm font-bold focus:bg-white focus:border-blue-500 focus:outline-none transition-all" placeholder="เช่น กาแฟนม, เค้กหน้านิ่ม..." />
               </div>
 
               {/* Price & Unit */}

@@ -19,7 +19,8 @@ import { getFirestore } from 'firebase/firestore';
  *     function isAdmin() {
  *       return request.auth != null && (
  *         request.auth.token.email == 'nasora.nsr300@gmail.com' || 
- *         request.auth.token.email == 'a@a.com'
+ *         request.auth.token.email == 'a@a.com' ||
+ *         request.auth.token.email == 'admin@gmail.com'
  *       );
  *     }
  *

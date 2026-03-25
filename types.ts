@@ -8,7 +8,6 @@ export interface Product {
   image: string;
   status: 'In Stock' | 'Sold Out';
   category: string;
-  type?: string; // เพิ่มฟิลด์ประเภทสินค้า
 }
 
 export interface CartItem extends Product {
@@ -52,4 +51,6 @@ export const DEFAULT_CATEGORIES = [
   'เบเกอรี่',
   'ของหวาน'
 ];
+
+export const ADMIN_EMAILS = ["nasora.nsr300@gmail.com", "a@a.com", "admin@gmail.com"];
 

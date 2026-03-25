@@ -1,15 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { db } from '../firebase';
 import { collection, query, orderBy, onSnapshot, where, doc, updateDoc } from 'firebase/firestore';
-import { Order } from '../types';
+import { Order, ADMIN_EMAILS } from '../types';
 import { User } from '../firebase';
 
 interface OrderListProps {
   user: User;
   onBack: () => void;
 }
-
-const ADMIN_EMAILS = ["nasora.nsr300@gmail.com", "a@a.com"];
 
 const OrderList: React.FC<OrderListProps> = ({ user, onBack }) => {
   const [orders, setOrders] = useState<Order[]>([]);

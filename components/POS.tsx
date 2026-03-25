@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { User, logOut, db } from '../firebase';
 // @ts-ignore
 import { collection, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
-import { Product, CartItem, CategoryItem, DEFAULT_CATEGORIES } from '../types';
+import { Product, CartItem, CategoryItem, DEFAULT_CATEGORIES, ADMIN_EMAILS } from '../types';
 
 interface POSProps {
   user: User;
@@ -14,8 +14,7 @@ interface POSProps {
   onOrdersClick?: () => void;
 }
 
-// กำหนดอีเมลสำหรับผู้ดูแลระบบ
-const ADMIN_EMAILS = ["nasora.nsr300@gmail.com", "a@a.com"];
+// กำหนดอีเมลสำหรับผู้ดูแลระบบ (นำเข้าจาก types.ts)
 
 const POS: React.FC<POSProps> = ({ user, onSwitchView, isGuest = false, onLogout, onProfileClick, onOrdersClick }) => {
   const [products, setProducts] = useState<Product[]>([]);
@@ -87,8 +86,7 @@ const POS: React.FC<POSProps> = ({ user, onSwitchView, isGuest = false, onLogout
   const filteredProducts = useMemo(() => {
     return products.filter(p => 
       (selectedCategory === 'ทั้งหมด' || p.category === selectedCategory) && 
-      (p.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-       (p.type && p.type.toLowerCase().includes(searchQuery.toLowerCase())))
+      p.title.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [products, selectedCategory, searchQuery]);
 
@@ -326,11 +324,6 @@ const POS: React.FC<POSProps> = ({ user, onSwitchView, isGuest = false, onLogout
                                     <span className="bg-red-500 text-white text-[10px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest shadow-lg transform -rotate-6 border border-white/20">หมดชั่วคราว</span>
                                 </div>
                             )}
-                            {product.type && (
-                                <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-md text-gray-800 text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg shadow-sm border border-gray-100">
-                                    {product.type}
-                                </div>
-                            )}
                             {!isGuest && (
                                 <div className="absolute bottom-2 right-2 bg-blue-600 text-white rounded-full p-2.5 opacity-0 group-hover:opacity-100 transition-all translate-y-4 group-hover:translate-y-0 shadow-lg">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -493,7 +486,7 @@ const POS: React.FC<POSProps> = ({ user, onSwitchView, isGuest = false, onLogout
                 <div className="p-8">
                     <div className="flex items-start justify-between mb-4">
                         <div>
-                            <div className="text-[10px] font-black uppercase tracking-widest text-blue-600 mb-1">{viewProduct.category} {viewProduct.type && `• ${viewProduct.type}`}</div>
+                            <div className="text-[10px] font-black uppercase tracking-widest text-blue-600 mb-1">{viewProduct.category}</div>
                             <h3 className="text-2xl font-black text-gray-900 leading-tight">{viewProduct.title}</h3>
                         </div>
                         <div className="text-right">

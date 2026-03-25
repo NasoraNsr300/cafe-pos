@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { User, db, auth, updateProfile } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { sendPasswordResetEmail } from 'firebase/auth';
-import { Member } from '../types';
+import { Member, ADMIN_EMAILS } from '../types';
 
 interface MemberProfileProps {
   user: User;
@@ -59,12 +59,13 @@ const MemberProfile: React.FC<MemberProfileProps> = ({ user, onBack, onViewOrder
     try {
       // 1. Update Firestore (use setDoc with merge to create if not exists)
       const docRef = doc(db, 'members', user.uid);
+      const defaultRole = user.email && ADMIN_EMAILS.includes(user.email) ? 'admin' : 'member';
       await setDoc(docRef, {
         displayName,
         birthDate,
         email: user.email, // Ensure email is saved
         uid: user.uid,     // Ensure uid is saved
-        role: memberData?.role || 'member' // Preserve role or default
+        role: memberData?.role || defaultRole // Preserve role or default
       }, { merge: true });
 
       // 2. Update Auth Profile (Display Name)
@@ -107,6 +108,10 @@ const MemberProfile: React.FC<MemberProfileProps> = ({ user, onBack, onViewOrder
       </div>
     );
   }
+
+  const isGuest = user.uid === 'guest';
+  const isAdmin = user.email && ADMIN_EMAILS.includes(user.email);
+  const displayRole = isGuest ? 'Guest Access' : (isAdmin || memberData?.role === 'admin' ? 'Administrator' : 'Staff Member');
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -164,7 +169,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({ user, onBack, onViewOrder
                     <h2 className="text-2xl font-bold text-gray-800">{displayName || 'Guest User'}</h2>
                     <p className="text-gray-500 text-sm">{user.email}</p>
                     <div className="mt-2 inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-600 border border-blue-100 uppercase tracking-wide">
-                        {memberData?.role || 'Member'}
+                        {displayRole}
                     </div>
                 </div>
                 <div className="mt-4 md:mt-0">
