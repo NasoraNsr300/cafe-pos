@@ -33,6 +33,19 @@ export interface Member {
   createdAt: any; // Firestore Timestamp
 }
 
+export interface Order {
+  id: string;
+  items: CartItem[];
+  total: number;
+  paymentMethod: string;
+  timestamp: any;
+  status: 'pending' | 'ready' | 'completed' | 'cancelled';
+  cashReceived?: number;
+  change?: number;
+  customerName?: string;
+  customerId?: string;
+}
+
 // ข้อมูลหมวดหมู่เริ่มต้นสำหรับระบบ (Seed Data)
 export const DEFAULT_CATEGORIES = [
   'เครื่องดื่ม',

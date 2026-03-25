@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { User, logOut, db } from '../firebase';
 // @ts-ignore
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
 import { Product, CartItem, CategoryItem, DEFAULT_CATEGORIES } from '../types';
 
 interface POSProps {
@@ -10,12 +10,14 @@ interface POSProps {
   onSwitchView: () => void;
   isGuest?: boolean;
   onLogout?: () => void;
+  onProfileClick?: () => void;
+  onOrdersClick?: () => void;
 }
 
 // กำหนดอีเมลสำหรับผู้ดูแลระบบ
-const ADMIN_EMAIL = "nasora.nsr300@gmail.com";
+const ADMIN_EMAILS = ["nasora.nsr300@gmail.com", "a@a.com"];
 
-const POS: React.FC<POSProps> = ({ user, onSwitchView, isGuest = false, onLogout }) => {
+const POS: React.FC<POSProps> = ({ user, onSwitchView, isGuest = false, onLogout, onProfileClick, onOrdersClick }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -33,7 +35,7 @@ const POS: React.FC<POSProps> = ({ user, onSwitchView, isGuest = false, onLogout
   const [error, setError] = useState<string | null>(null);
 
   // ตรวจสอบสิทธิ์ Admin
-  const isAdmin = !isGuest && user.email === ADMIN_EMAIL;
+  const isAdmin = !isGuest && user.email && ADMIN_EMAILS.includes(user.email);
 
   useEffect(() => {
     // Fetch Products
@@ -119,12 +121,29 @@ const POS: React.FC<POSProps> = ({ user, onSwitchView, isGuest = false, onLogout
     }));
   };
 
-  const handlePayment = () => {
+  const handlePayment = async () => {
     if (isGuest) return;
-    setLastOrderTotal(total);
-    setShowQR(false);
-    setShowSuccess(true);
-    setCart([]); // เคลียร์ตะกร้าสินค้าทันทีที่ชำระเงินสำเร็จ
+    
+    try {
+      // Create Order in Firestore
+      await addDoc(collection(db, 'orders'), {
+        items: cart,
+        total: total,
+        paymentMethod: 'qrcode', // Default to QR Code for now as per UI
+        timestamp: serverTimestamp(),
+        status: 'pending',
+        customerName: user.displayName || user.email,
+        customerId: user.uid
+      });
+
+      setLastOrderTotal(total);
+      setShowQR(false);
+      setShowSuccess(true);
+      setCart([]); // เคลียร์ตะกร้าสินค้าทันทีที่ชำระเงินสำเร็จ
+    } catch (error) {
+      console.error("Error saving order:", error);
+      alert("เกิดข้อผิดพลาดในการบันทึกออเดอร์: " + error);
+    }
   };
 
   const handleNewOrder = () => {
@@ -178,25 +197,40 @@ const POS: React.FC<POSProps> = ({ user, onSwitchView, isGuest = false, onLogout
         <div className="flex items-center gap-5">
             {/* Admin Only Button */}
             {isAdmin && (
-                <button
-                    onClick={onSwitchView}
-                    className="hidden lg:flex items-center gap-2 bg-gray-800 text-white px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-gray-900 transition-all shadow-md hover:shadow-xl active:scale-95"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg>
-                    <span>จัดการสินค้า</span>
-                </button>
+                <div className="hidden lg:flex items-center gap-2">
+                    <button
+                        onClick={onOrdersClick}
+                        className="flex items-center gap-2 bg-white text-gray-700 border border-gray-200 px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-gray-50 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm active:scale-95"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                        <span>รายการออเดอร์</span>
+                    </button>
+                    <button
+                        onClick={onSwitchView}
+                        className="flex items-center gap-2 bg-gray-800 text-white px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-gray-900 transition-all shadow-md hover:shadow-xl active:scale-95"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg>
+                        <span>จัดการสินค้า</span>
+                    </button>
+                </div>
             )}
 
             {/* Account Management */}
             <div className="flex items-center gap-3 pl-5 border-l border-gray-200">
-                <div className="text-right hidden sm:block">
+                <div 
+                  className={`text-right hidden sm:block ${!isGuest ? 'cursor-pointer hover:opacity-80' : ''}`}
+                  onClick={!isGuest && onProfileClick ? onProfileClick : undefined}
+                >
                     <p className="text-sm font-bold text-gray-800 leading-tight truncate max-w-[150px]">{user.displayName || user.email}</p>
                     <p className={`text-[9px] font-black uppercase tracking-widest ${isAdmin ? 'text-blue-600' : 'text-gray-400'}`}>
                         {isGuest ? 'Guest Access' : (isAdmin ? 'Administrator' : 'Staff Member')}
                     </p>
                 </div>
                 <div className="group relative">
-                    <div className="h-10 w-10 rounded-full bg-gray-100 border-2 border-white shadow-md overflow-hidden cursor-pointer hover:ring-2 hover:ring-blue-200 transition-all">
+                    <div 
+                      className={`h-10 w-10 rounded-full bg-gray-100 border-2 border-white shadow-md overflow-hidden transition-all ${!isGuest ? 'cursor-pointer hover:ring-2 hover:ring-blue-200' : ''}`}
+                      onClick={!isGuest && onProfileClick ? onProfileClick : undefined}
+                    >
                         <img
                             src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName || 'Guest'}&background=random`}
                             alt="User"

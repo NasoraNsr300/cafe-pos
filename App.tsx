@@ -4,8 +4,10 @@ import { auth, onAuthStateChanged, User } from './firebase';
 import Login from './components/Login';
 import POS from './components/POS';
 import ManageProducts from './components/ManageProducts';
+import MemberProfile from './components/MemberProfile';
+import OrderList from './components/OrderList';
 
-type View = 'pos' | 'manage';
+type View = 'pos' | 'manage' | 'profile' | 'orders';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -79,9 +81,15 @@ const App: React.FC = () => {
           onSwitchView={() => setCurrentView('manage')} 
           isGuest={isGuest}
           onLogout={handleLogout}
+          onProfileClick={() => setCurrentView('profile')}
+          onOrdersClick={() => setCurrentView('orders')}
         />
-      ) : (
+      ) : currentView === 'manage' ? (
         <ManageProducts user={activeUser} onBack={() => setCurrentView('pos')} />
+      ) : currentView === 'orders' ? (
+        <OrderList user={activeUser} onBack={() => setCurrentView('pos')} />
+      ) : (
+        <MemberProfile user={activeUser} onBack={() => setCurrentView('pos')} onViewOrders={() => setCurrentView('orders')} />
       )}
     </div>
   );

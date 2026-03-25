@@ -14,17 +14,41 @@ import { getFirestore } from 'firebase/firestore';
  * rules_version = '2';
  * service cloud.firestore {
  *   match /databases/{database}/documents {
- *     
- *     // Rules for Products
+ *
+ *     // ฟังก์ชันตรวจสอบว่าเป็น Admin หรือไม่ (ระบุอีเมลผู้ดูแลระบบที่นี่)
+ *     function isAdmin() {
+ *       return request.auth != null && (
+ *         request.auth.token.email == 'nasora.nsr300@gmail.com' || 
+ *         request.auth.token.email == 'a@a.com'
+ *       );
+ *     }
+ *
+ *     // 1. สินค้า (Products) และ หมวดหมู่ (Categories)
+ *     // - ทุกคนดูได้ (รวมถึง Guest)
+ *     // - เฉพาะ Admin แก้ไขได้
  *     match /cafe/{document=**} {
  *       allow read: if true;
- *       allow write: if request.auth != null;
+ *       allow write: if isAdmin();
  *     }
  *     
- *     // Rules for Categories (New)
  *     match /categories/{document=**} {
  *       allow read: if true;
- *       allow write: if request.auth != null;
+ *       allow write: if isAdmin();
+ *     }
+ *
+ *     // 2. ข้อมูลสมาชิก (Members)
+ *     // - อนุญาตให้คนที่ Login แล้ว อ่าน/เขียน ข้อมูลได้ (เพื่อแก้ปัญหา Permission)
+ *     match /members/{userId} {
+ *       allow read, write: if request.auth != null;
+ *     }
+ *
+ *     // 3. รายการออเดอร์ (Orders)
+ *     // - Admin อ่านได้ทั้งหมด
+ *     // - สมาชิกทั่วไป สร้างได้ (create) และอ่านของตัวเองได้
+ *     match /orders/{orderId} {
+ *       allow read: if isAdmin() || (request.auth != null && request.auth.uid == resource.data.customerId);
+ *       allow create: if request.auth != null;
+ *       allow update, delete: if isAdmin();
  *     }
  *   }
  * }
