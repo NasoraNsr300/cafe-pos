@@ -8,7 +8,7 @@ import {
   auth,
   db
 } from '../firebase';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 
 interface LoginProps {
   onGuestLogin?: () => void;
@@ -19,7 +19,6 @@ const Login: React.FC<LoginProps> = ({ onGuestLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
-  const [address, setAddress] = useState('');
   const [birthDate, setBirthDate] = useState('');
   const [error, setError] = useState('');
   const [showHelp, setShowHelp] = useState(false);
@@ -46,7 +45,6 @@ const Login: React.FC<LoginProps> = ({ onGuestLogin }) => {
           uid: user.uid,
           email: user.email,
           displayName: displayName || 'Member',
-          address: address || '',
           birthDate: birthDate || '',
           role: 'member', // ค่าเริ่มต้น
           createdAt: serverTimestamp()
@@ -99,7 +97,23 @@ const Login: React.FC<LoginProps> = ({ onGuestLogin }) => {
     setError('');
     setShowHelp(false);
     try {
-      await signInWithGoogle();
+      const result = await signInWithGoogle();
+      const user = result.user;
+      
+      // ตรวจสอบและสร้างข้อมูล member พื้นฐานถ้ายังไม่มี (สำหรับ Google Login)
+      const docRef = doc(db, "members", user.uid);
+      const docSnap = await getDoc(docRef);
+      
+      if (!docSnap.exists()) {
+        await setDoc(docRef, {
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName || 'Member',
+          birthDate: '',
+          role: 'member', // กำหนดให้เป็น member เป็นพื้นฐาน
+          createdAt: serverTimestamp()
+        });
+      }
     } catch (err: any) {
       console.error("Google Auth Error:", err.code);
       if (err.code === 'auth/unauthorized-domain') {
@@ -188,20 +202,6 @@ const Login: React.FC<LoginProps> = ({ onGuestLogin }) => {
                   value={birthDate}
                   onChange={(e) => setBirthDate(e.target.value)}
                   className="w-full rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3.5 text-sm font-medium focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-50 transition-all"
-                  required={isSignUp}
-                />
-              </div>
-            )}
-
-            {isSignUp && (
-              <div className="space-y-1.5 animate-in fade-in slide-in-from-left-2 duration-300 delay-100">
-                <label className="text-xs font-black uppercase text-gray-400 tracking-widest ml-1">ที่อยู่</label>
-                <textarea
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  className="w-full rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3.5 text-sm font-medium focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-50 transition-all resize-none"
-                  placeholder="ที่อยู่ของคุณ..."
-                  rows={3}
                   required={isSignUp}
                 />
               </div>

@@ -18,7 +18,6 @@ const MemberProfile: React.FC<MemberProfileProps> = ({ user, onBack, onViewOrder
 
   // Form State
   const [displayName, setDisplayName] = useState('');
-  const [address, setAddress] = useState('');
   const [birthDate, setBirthDate] = useState('');
 
   useEffect(() => {
@@ -36,7 +35,6 @@ const MemberProfile: React.FC<MemberProfileProps> = ({ user, onBack, onViewOrder
           const data = docSnap.data() as Member;
           setMemberData(data);
           setDisplayName(data.displayName || user.displayName || '');
-          setAddress(data.address || '');
           setBirthDate(data.birthDate || '');
         } else {
           // Fallback if no Firestore data yet
@@ -63,7 +61,6 @@ const MemberProfile: React.FC<MemberProfileProps> = ({ user, onBack, onViewOrder
       const docRef = doc(db, 'members', user.uid);
       await setDoc(docRef, {
         displayName,
-        address,
         birthDate,
         email: user.email, // Ensure email is saved
         uid: user.uid,     // Ensure uid is saved
@@ -78,7 +75,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({ user, onBack, onViewOrder
       }
 
       // 3. Update Local State
-      setMemberData(prev => prev ? { ...prev, displayName, address, birthDate } : null);
+      setMemberData(prev => prev ? { ...prev, displayName, birthDate } : null);
       setIsEditing(false);
       alert('บันทึกข้อมูลเรียบร้อยแล้ว');
     } catch (error) {
@@ -245,24 +242,6 @@ const MemberProfile: React.FC<MemberProfileProps> = ({ user, onBack, onViewOrder
                         </div>
                         {isEditing && <p className="text-xs text-gray-400 mt-1">* กดปุ่มเพื่อรับอีเมลสำหรับตั้งรหัสผ่านใหม่</p>}
                     </div>
-                </div>
-
-                {/* Address */}
-                <div className="space-y-2">
-                    <label className="block text-sm font-bold text-gray-700">ที่อยู่</label>
-                    {isEditing ? (
-                        <textarea 
-                            value={address} 
-                            onChange={(e) => setAddress(e.target.value)}
-                            rows={3}
-                            className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all resize-none"
-                            placeholder="ที่อยู่จัดส่งสินค้า..."
-                        />
-                    ) : (
-                        <div className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-800 min-h-[100px]">
-                            {address || '-'}
-                        </div>
-                    )}
                 </div>
             </div>
         </div>

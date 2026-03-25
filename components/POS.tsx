@@ -21,7 +21,7 @@ const POS: React.FC<POSProps> = ({ user, onSwitchView, isGuest = false, onLogout
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string>(''); // เริ่มต้นว่างไว้ก่อน
+  const [selectedCategory, setSelectedCategory] = useState<string>('ทั้งหมด'); // เริ่มต้นที่ ทั้งหมด
   
   // View Product Detail State
   const [viewProduct, setViewProduct] = useState<Product | null>(null);
@@ -80,13 +80,13 @@ const POS: React.FC<POSProps> = ({ user, onSwitchView, isGuest = false, onLogout
   // เมื่อโหลด Categories เสร็จ ให้เลือกหมวดหมู่แรกอัตโนมัติถ้ายังไม่ได้เลือก
   useEffect(() => {
       if (!selectedCategory && categories.length > 0) {
-          setSelectedCategory(categories[0].name);
+          setSelectedCategory('ทั้งหมด');
       }
   }, [categories, selectedCategory]);
 
   const filteredProducts = useMemo(() => {
     return products.filter(p => 
-      p.category === selectedCategory && 
+      (selectedCategory === 'ทั้งหมด' || p.category === selectedCategory) && 
       (p.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
        (p.type && p.type.toLowerCase().includes(searchQuery.toLowerCase())))
     );
@@ -261,6 +261,16 @@ const POS: React.FC<POSProps> = ({ user, onSwitchView, isGuest = false, onLogout
             {/* Category Tabs */}
             <div className="px-6 pt-6 pb-2">
                 <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
+                    <button
+                        onClick={() => setSelectedCategory('ทั้งหมด')}
+                        className={`px-6 py-3 rounded-2xl font-bold text-sm whitespace-nowrap transition-all border ${
+                            selectedCategory === 'ทั้งหมด'
+                                ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-200 scale-105'
+                                : 'bg-white text-gray-500 border-gray-100 hover:border-gray-300 hover:bg-gray-50'
+                        }`}
+                    >
+                        ทั้งหมด
+                    </button>
                     {categories.length === 0 ? (
                         // Skeleton Loaders for Categories
                         [1,2,3].map(i => <div key={i} className="h-10 w-24 bg-gray-200 rounded-2xl animate-pulse"></div>)
