@@ -20,7 +20,6 @@ const Login: React.FC<LoginProps> = ({ onGuestLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
-  const [birthDate, setBirthDate] = useState('');
   const [error, setError] = useState('');
   const [showHelp, setShowHelp] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -47,7 +46,6 @@ const Login: React.FC<LoginProps> = ({ onGuestLogin }) => {
           uid: user.uid,
           email: user.email,
           displayName: displayName || 'Member',
-          birthDate: birthDate || '',
           role: role, // ค่าเริ่มต้น หรือ admin ถ้าเป็นอีเมลผู้ดูแล
           createdAt: serverTimestamp()
         });
@@ -112,7 +110,6 @@ const Login: React.FC<LoginProps> = ({ onGuestLogin }) => {
           uid: user.uid,
           email: user.email,
           displayName: user.displayName || 'Member',
-          birthDate: '',
           role: role, // กำหนดให้เป็น member เป็นพื้นฐาน หรือ admin ถ้าเป็นอีเมลผู้ดูแล
           createdAt: serverTimestamp()
         });
@@ -192,19 +189,6 @@ const Login: React.FC<LoginProps> = ({ onGuestLogin }) => {
                   onChange={(e) => setDisplayName(e.target.value)}
                   className="w-full rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3.5 text-sm font-medium focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-50 transition-all"
                   placeholder="ชื่อของคุณ"
-                  required={isSignUp}
-                />
-              </div>
-            )}
-
-            {isSignUp && (
-              <div className="space-y-1.5 animate-in fade-in slide-in-from-left-2 duration-300 delay-75">
-                <label className="text-xs font-black uppercase text-gray-400 tracking-widest ml-1">วันเกิด</label>
-                <input
-                  type="date"
-                  value={birthDate}
-                  onChange={(e) => setBirthDate(e.target.value)}
-                  className="w-full rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3.5 text-sm font-medium focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-50 transition-all"
                   required={isSignUp}
                 />
               </div>
